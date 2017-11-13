@@ -6,6 +6,7 @@ Usage:
   manage-par2 create [options] <SOURCEDIR> <RECOVERYDIR>
   manage-par2 list-outdated <SOURCEDIR> <RECOVERYDIR>
   manage-par2 delete-outdated <SOURCEDIR> <RECOVERYDIR>
+  manage-par2 verify <SOURCEDIR> <RECOVERYDIR>
 
 Options:
     --fast      do not run as "background" process [default: False]
@@ -32,6 +33,17 @@ def find_missing_files(source_dir, recovery_dir):
             if not os.path.exists(recovery_file_path):
                 yield (source_path, recovery_file_path)
 
+def find_existing_files(source_dir, recovery_dir):
+    get_relative_dir = lambda path: path[len(source_dir)+1:]
+    for root_dir, dirnames, filenames in os.walk(source_dir):
+        relative_dir = get_relative_dir(root_dir)
+        for filename in filenames:
+            source_path = os.path.join(root_dir, filename)
+            recovery_file_path = os.path.join(recovery_dir, relative_dir, filename) + '.par2'
+            if os.path.exists(recovery_file_path):
+                yield (source_path, recovery_file_path)
+
+
 def create_par2_data(missing_data, source_base_dir, *, redundancy_percentage=10):
     source_path, recovery_file_path = missing_data
     cmd = (
@@ -42,6 +54,24 @@ def create_par2_data(missing_data, source_base_dir, *, redundancy_percentage=10)
         recovery_file_path, source_path
     )
     subprocess.check_call(cmd, shell=False, stdout=subprocess.PIPE)
+
+
+def verify_par2_data(existing_data, source_base_dir):
+    source_path, recovery_file_path = existing_data
+    cmd = (
+        'par2', 'verify',
+        #'-qq',
+        '-B'+source_base_dir,
+        recovery_file_path, source_path
+    )
+    verify_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+    (stdout_data, stderr_data) = verify_process.communicate()
+    exit_code = verify_process.returncode
+    if exit_code == 0:
+        return
+    sys.stderr.write('BAD %s\n' % source_path)
+    sys.stderr.write('   use "par2 repair -B%s %s"\n' % (source_base_dir, recovery_file_path))
+
 
 def find_outdated_files(source_dir, recovery_dir):
     get_relative_dir = lambda path: path[len(source_dir)+1:]
@@ -103,6 +133,7 @@ if __name__ == '__main__':
     work_in_background = not arguments['--fast']
     list_outdated = arguments['list-outdated']
     delete_outdated = arguments['delete-outdated']
+    verify = arguments['verify']
 
     if work_in_background:
         pid = os.getpid()
@@ -116,6 +147,14 @@ if __name__ == '__main__':
             create_par2_data(missing_data, source_dir)
             sys.stdout.write('.')
             sys.stdout.flush()
+    elif verify:
+        existing_files = tuple(find_existing_files(source_dir, recovery_dir))
+        for existing_data in existing_files:
+            verify_par2_data(existing_data, source_dir)
+            sys.stdout.write('.')
+            sys.stdout.flush()
+        if len(existing_files) > 0:
+            sys.stdout.write('\n')
     else:
         outdated_files = set()
         for outdated_data in find_outdated_files(source_dir, recovery_dir):

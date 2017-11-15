@@ -141,6 +141,11 @@ if __name__ == '__main__':
         subprocess.check_call(('ionice', '--class', 'idle', '-p', str(pid)))
 
     source_dir = os.path.abspath(source_dir_str)
+
+    if not os.path.exists(source_dir):
+        sys.stderr.write('data directory "%s" does not exist.\n' % source_dir_str)
+        sys.exit(51)
+
     if arguments['create']:
         missing_files = find_missing_files(source_dir, recovery_dir)
         for i, missing_data in enumerate(missing_files):

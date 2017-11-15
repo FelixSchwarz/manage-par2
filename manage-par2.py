@@ -48,12 +48,25 @@ def create_par2_data(missing_data, source_base_dir, *, redundancy_percentage=10)
     source_path, recovery_file_path = missing_data
     cmd = (
         'par2', 'create',
-        '-qq',
+        #'-qq',
         '-r%d' % redundancy_percentage,
         '-B'+source_base_dir,
         recovery_file_path, source_path
     )
-    subprocess.check_call(cmd, shell=False, stdout=subprocess.PIPE)
+    create_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (stdout_data, stderr_data) = create_process.communicate()
+    exit_code = create_process.returncode
+    if exit_code == 0:
+        return
+    sys.stderr.write('par2 exited with code %d while trying to create parity data for "%s": \n' % (exit_code, source_path))
+    if exit_code == 6:
+        sys.stderr.write('    likely cause: unable to read file due to file permissions\n')
+    #sys.stderr.write('  cmd was: %s\n' % ' '.join(cmd))
+    # we need to flush first to ensure the line above is actually written out
+    # before the data below (which accesses ".stderr.buffer" directly)
+    sys.stderr.flush()
+    sys.stderr.buffer.write(stdout_data)
+    sys.stderr.buffer.write(stderr_data)
 
 
 def verify_par2_data(existing_data, source_base_dir):

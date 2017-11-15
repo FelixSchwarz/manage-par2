@@ -3,10 +3,10 @@
 manage-par2.
 
 Usage:
-  manage-par2 create [options] <SOURCEDIR> <RECOVERYDIR>
-  manage-par2 list-outdated <SOURCEDIR> <RECOVERYDIR>
-  manage-par2 delete-outdated <SOURCEDIR> <RECOVERYDIR>
-  manage-par2 verify <SOURCEDIR> <RECOVERYDIR>
+  manage-par2 create [options] <SOURCEDIR> [<RECOVERYDIR>]
+  manage-par2 list-outdated <SOURCEDIR> [<RECOVERYDIR>]
+  manage-par2 delete-outdated <SOURCEDIR> [<RECOVERYDIR>]
+  manage-par2 verify <SOURCEDIR> [<RECOVERYDIR>]
 
 Options:
     --fast      do not run as "background" process [default: False]
@@ -129,7 +129,7 @@ if __name__ == '__main__':
     arguments = docopt(__doc__)
 
     source_dir_str = arguments['<SOURCEDIR>']
-    recovery_dir = arguments['<RECOVERYDIR>']
+    recovery_dir_str = arguments['<RECOVERYDIR>']
     work_in_background = not arguments['--fast']
     list_outdated = arguments['list-outdated']
     delete_outdated = arguments['delete-outdated']
@@ -141,10 +141,16 @@ if __name__ == '__main__':
         subprocess.check_call(('ionice', '--class', 'idle', '-p', str(pid)))
 
     source_dir = os.path.abspath(source_dir_str)
+    if not recovery_dir_str:
+        recovery_dir_str = source_dir_str + '.parity'
+    recovery_dir = os.path.abspath(recovery_dir_str)
 
     if not os.path.exists(source_dir):
         sys.stderr.write('data directory "%s" does not exist.\n' % source_dir_str)
         sys.exit(51)
+    if not os.path.exists(recovery_dir):
+        os.makedirs(recovery_dir)
+        sys.stdout.write('created parity directory "%s"\n' % recovery_dir_str)
 
     if arguments['create']:
         missing_files = find_missing_files(source_dir, recovery_dir)
